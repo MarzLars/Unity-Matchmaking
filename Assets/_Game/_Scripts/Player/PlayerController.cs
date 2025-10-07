@@ -11,7 +11,7 @@ public class PlayerController : NetworkBehaviour {
 
     private void Update() {
         var dir = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
-        _rb.velocity = dir * _speed;
+        _rb.linearVelocity = dir * _speed;
     }
 
     public override void OnNetworkSpawn() {
