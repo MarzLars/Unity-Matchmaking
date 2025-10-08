@@ -230,11 +230,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9271e45f42d00da4dabdd0b02d2487e7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _difficultyDialMaxAngle: 100
-  _nameText: {fileID: 5292934454748077033}
-  _typeText: {fileID: 5292934454899959814}
-  _playerCountText: {fileID: 5292934454014876966}
-  _difficultyMeter: {fileID: 0}
+  nameText: {fileID: 5292934454748077033}
+  typeText: {fileID: 5292934454899959814}
+  playerCountText: {fileID: 5292934454014876966}
 --- !u!114 &1580804313178355777
 MonoBehaviour:
   m_ObjectHideFlags: 0

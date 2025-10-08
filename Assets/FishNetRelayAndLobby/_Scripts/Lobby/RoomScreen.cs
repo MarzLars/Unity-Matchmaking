@@ -5,16 +5,18 @@ using FishNet;
 using TMPro;
 using Unity.Services.Lobbies.Models;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 ///     NetworkBehaviours cannot easily be parented, so the network logic will take place
 ///     on the network scene object "NetworkLobby"
 /// </summary>
 public class RoomScreen : MonoBehaviour {
-    [SerializeField] private LobbyPlayerPanel _playerPanelPrefab;
-    [SerializeField] private Transform _playerPanelParent;
-    [SerializeField] private TMP_Text _waitingText;
-    [SerializeField] private GameObject _startButton, _readyButton;
+    [FormerlySerializedAs("_playerPanelPrefab")] [SerializeField] private LobbyPlayerPanel playerPanelPrefab;
+    [FormerlySerializedAs("_playerPanelParent")] [SerializeField] private Transform playerPanelParent;
+    [FormerlySerializedAs("_waitingText")] [SerializeField] private TMP_Text waitingText;
+    [FormerlySerializedAs("_startButton")] [SerializeField] private GameObject startButton;
+    [FormerlySerializedAs("_readyButton")] [SerializeField] private GameObject readyButton;
 
     private readonly List<LobbyPlayerPanel> _playerPanels = new();
     private bool _allReady;
@@ -23,15 +25,18 @@ public class RoomScreen : MonoBehaviour {
     public static event Action StartPressed; 
 
     private void OnEnable() {
-        foreach (Transform child in _playerPanelParent) Destroy(child.gameObject);
+        foreach (Transform child in playerPanelParent) Destroy(child.gameObject);
         _playerPanels.Clear();
 
         LobbyOrchestrator.LobbyPlayersUpdated += NetworkLobbyPlayersUpdated;
         MatchmakingService.CurrentLobbyRefreshed += OnCurrentLobbyRefreshed;
-        _startButton.SetActive(false);
-        _readyButton.SetActive(false);
-
+        
         _ready = false;
+        
+        // Show appropriate buttons based on role
+        bool isHost = InstanceFinder.ServerManager != null && InstanceFinder.ServerManager.Started;
+        startButton.SetActive(false); // Will be enabled when all players are ready
+        readyButton.SetActive(!isHost); // Non-host players can ready up immediately
     }
 
     private void OnDisable() {
@@ -61,23 +66,25 @@ public class RoomScreen : MonoBehaviour {
                 if (player.Value) currentPanel.SetReady();
             }
             else {
-                var panel = Instantiate(_playerPanelPrefab, _playerPanelParent);
+                var panel = Instantiate(playerPanelPrefab, playerPanelParent);
                 panel.Init(player.Key);
                 _playerPanels.Add(panel);
             }
         }
 
         bool isHost = InstanceFinder.ServerManager != null && InstanceFinder.ServerManager.Started;
-        _startButton.SetActive(isHost && players.All(p => p.Value));
-        _readyButton.SetActive(!_ready);
+        bool allPlayersReady = players.Count > 0 && players.All(p => p.Value);
+        
+        startButton.SetActive(isHost && allPlayersReady);
+        readyButton.SetActive(!isHost && !_ready);
     }
 
     private void OnCurrentLobbyRefreshed(Lobby lobby) {
-        _waitingText.text = $"Waiting on players... {lobby.Players.Count}/{lobby.MaxPlayers}";
+        waitingText.text = $"Waiting on players... {lobby.Players.Count}/{lobby.MaxPlayers}";
     }
 
     public void OnReadyClicked() {
-        _readyButton.SetActive(false);
+        readyButton.SetActive(false);
         _ready = true;
     }
 

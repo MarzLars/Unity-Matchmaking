@@ -4,7 +4,7 @@ using FishNet.Object;
 using UnityEngine;
 
 public class GameManager : NetworkBehaviour {
-    [SerializeField] private GameObject _playerPrefab;
+    [SerializeField] GameObject _playerPrefab;
 
     public override void OnStartClient() {
         base.OnStartClient();
@@ -12,7 +12,7 @@ public class GameManager : NetworkBehaviour {
     }
 
     [ServerRpc(RequireOwnership = false)]
-    private void SpawnPlayerServerRpc(NetworkConnection conn) {
+    void SpawnPlayerServerRpc(NetworkConnection conn) {
         var spawn = Instantiate(_playerPrefab);
         ServerManager.Spawn(spawn, conn);
     }
@@ -22,11 +22,11 @@ public class GameManager : NetworkBehaviour {
         HandleLeaveLobby();
     }
 
-    private async void HandleLeaveLobby() {
+    async void HandleLeaveLobby() {
         await MatchmakingService.LeaveLobby();
     }
 
-    private void OnDestroy() {
+    void OnDestroy() {
         if (InstanceFinder.NetworkManager != null) {
             InstanceFinder.ServerManager?.StopConnection(true);
             InstanceFinder.ClientManager?.StopConnection();

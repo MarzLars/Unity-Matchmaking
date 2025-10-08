@@ -1,18 +1,20 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class LobbyPlayerPanel : MonoBehaviour {
-    [SerializeField] private TMP_Text _nameText, _statusText;
+    [FormerlySerializedAs("_nameText")] [SerializeField] private TMP_Text nameText;
+    [FormerlySerializedAs("_statusText")] [SerializeField] private TMP_Text statusText;
 
     public int PlayerId { get; private set; }
 
     public void Init(int playerId) {
         PlayerId = playerId;
-        _nameText.text = $"Player {playerId}";
+        nameText.text = $"Player {playerId}";
     }
 
     public void SetReady() {
-        _statusText.text = "Ready";
-        _statusText.color = Color.green;
+        statusText.text = "Ready";
+        statusText.color = Color.green;
     }
 }

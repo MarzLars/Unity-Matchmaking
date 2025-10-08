@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 
 public static class MatchmakingService {
     const int HeartbeatInterval = 15;
-    const int LobbyRefreshRate = 2; // Rate limits at 2
+    const int LobbyRefreshRate = 5; // Increased from 2 to avoid rate limiting
 
     static UnityTransport _transport;
 
@@ -28,8 +28,8 @@ public static class MatchmakingService {
     public static event Action<Lobby> CurrentLobbyRefreshed;
 
     public static void ResetStatics() {
-        if (Transport != null) {
-            if (InstanceFinder.NetworkManager != null) {
+        if (Transport) {
+            if (InstanceFinder.NetworkManager) {
                 InstanceFinder.ServerManager?.StopConnection(true);
                 InstanceFinder.ClientManager?.StopConnection();
             }
@@ -44,8 +44,8 @@ public static class MatchmakingService {
             Count = 15,
 
             Filters = new List<QueryFilter> {
-                new(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT),
-                new(QueryFilter.FieldOptions.IsLocked, "0", QueryFilter.OpOptions.EQ)
+                new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT),
+                new QueryFilter(QueryFilter.FieldOptions.IsLocked, "0", QueryFilter.OpOptions.EQ)
             }
         };
 
@@ -55,8 +55,8 @@ public static class MatchmakingService {
 
     public static async Task CreateLobbyWithAllocation(LobbyData data) {
         // Create a relay allocation and generate a join code to share with the lobby
-        var a = await RelayService.Instance.CreateAllocationAsync(data.MaxPlayers);
-        var joinCode = await RelayService.Instance.GetJoinCodeAsync(a.AllocationId);
+        var allocation = await RelayService.Instance.CreateAllocationAsync(data.MaxPlayers);
+        string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
         // Create a lobby, adding the relay join code to the lobby data
         var options = new CreateLobbyOptions {
@@ -71,7 +71,7 @@ public static class MatchmakingService {
 
         _currentLobby = await LobbyService.Instance.CreateLobbyAsync(data.Name, data.MaxPlayers, options);
 
-        SetHostRelayData(a);
+        SetHostRelayData(allocation);
 
         Heartbeat();
         PeriodicallyRefreshLobby();
@@ -110,12 +110,50 @@ public static class MatchmakingService {
     }
 
     public static async Task JoinLobbyWithAllocation(string lobbyId) {
-        _currentLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobbyId);
-        var a = await RelayService.Instance.JoinAllocationAsync(_currentLobby.Data[Constants.JoinKey].Value);
+        // First, ensure we're not in any other lobbies
+        await EnsureNotInOtherLobbies(lobbyId);
 
-        SetClientRelayData(a);
+        try {
+            _currentLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobbyId);
+        }
+        catch (LobbyServiceException e) when (e.Reason == LobbyExceptionReason.LobbyConflict) {
+            // Player is already in this lobby, just fetch the current state
+            Debug.Log($"Player already in lobby {lobbyId}, fetching current state...");
+            _currentLobby = await LobbyService.Instance.GetLobbyAsync(lobbyId);
+        }
+
+        var joinAllocation = await RelayService.Instance.JoinAllocationAsync(_currentLobby.Data[Constants.JoinKey].Value);
+
+        SetClientRelayData(joinAllocation);
 
         PeriodicallyRefreshLobby();
+    }
+
+    /// <summary>
+    /// Ensures the player is not in any other lobbies before joining a new one
+    /// </summary>
+    private static async Task EnsureNotInOtherLobbies(string targetLobbyId) {
+        try {
+            var joinedLobbies = await LobbyService.Instance.GetJoinedLobbiesAsync();
+            
+            foreach (var joinedLobbyId in joinedLobbies) {
+                // Skip if it's the lobby we're trying to join
+                if (joinedLobbyId == targetLobbyId) {
+                    continue;
+                }
+
+                try {
+                    await LobbyService.Instance.RemovePlayerAsync(joinedLobbyId, Authentication.PlayerId);
+                    Debug.Log($"Left old lobby: {joinedLobbyId}");
+                }
+                catch (Exception e) {
+                    Debug.LogWarning($"Failed to leave lobby {joinedLobbyId}: {e.Message}");
+                }
+            }
+        }
+        catch (Exception e) {
+            Debug.LogWarning($"Failed to check joined lobbies: {e.Message}");
+        }
     }
 
     static void SetClientRelayData(JoinAllocation allocation) {
